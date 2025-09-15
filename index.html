@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Futbolchilar — kartalar va qidiruv</title>
+  <style>
+    :root{
+      --bg:#0b1220;--surface:#111a2b;--card:#0f1730;--text:#eaf2ff;--muted:#9bb0d0;--accent:#7cc4ff;--border:#22314f;--radius:16px;--shadow:0 10px 30px rgba(0,0,0,.35)
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans",Arial;}
+    .container{max-width:1100px;margin:0 auto;padding:20px}
+    header{position:sticky;top:0;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:saturate(1.2) blur(6px);z-index:5;margin-bottom:10px}
+    .bar{display:flex;gap:10px;align-items:center}
+    .brand{font-weight:800;display:flex;align-items:center;gap:10px}
+    .logo{width:34px;height:34px;border-radius:10px;background:conic-gradient(from 180deg,#7cc4ff,#b388ff,#ff8ac6,#7cc4ff);box-shadow:var(--shadow)}
+    .field{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:10px 14px}
+    .field input{flex:1;background:transparent;border:0;outline:0;color:inherit;font-size:14px}
+    .btn{cursor:pointer;border:1px solid var(--border);background:var(--surface);color:inherit;border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+    .hint{color:var(--muted);font-size:12px;margin-top:6px}
+
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:16px}
+    .card{grid-column:span 3;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+    @media (max-width: 1000px){ .card{grid-column:span 4} }
+    @media (max-width: 700px){ .card{grid-column:span 6} }
+    @media (max-width: 480px){ .card{grid-column:span 12} }
+
+    .top{display:flex;align-items:center;gap:10px}
+    .avatar{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:20px;color:#0b1220;background:#7cc4ff;box-shadow:inset 0 0 0 3px rgba(255,255,255,.2)}
+    .meta{display:grid}
+    .name{font-weight:800}
+    .sub{font-size:12px;color:var(--muted)}
+    .tags{display:flex;gap:6px;flex-wrap:wrap}
+    .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:rgba(124,196,255,.12)}
+    .empty{padding:30px;border:1px dashed var(--border);border-radius:14px;text-align:center;color:var(--muted)}
+
+    .letters{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .chip{cursor:pointer;border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 10px;font-size:13px}
+    .chip.active{outline:2px solid var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="bar">
+        <div class="brand"><div class="logo"></div> Futbolchilar</div>
+        <div class="field"><span>🔎</span><input id="q" placeholder="Harf yozing: masalan, r yoki m…"/><button id="search" class="btn">Qidir</button></div>
+        <button id="clear" class="btn">Tozalash</button>
+      </div>
+      <div class="letters" id="letters"></div>
+      <div class="hint">Masalan: <b>r</b> — <i>Ronaldo, Ronaldinho, Ramos</i>; <b>m</b> — <i>Messi, Modrić, Mane</i>. Filtrlash <b>boshlanish harfi</b> bo‘yicha ishlaydi.</div>
+    </header>
+
+    <section id="grid" class="grid"></section>
+    <div id="empty" class="empty" style="display:none">Natija topilmadi. Boshqa harfni sinab ko‘ring.</div>
+  </div>
+
+  <script>
+    // Ma'lumotlar (namuna to'plam):
+    const players = [
+{name: 'Lionel Messi', country: 'Argentina', club: 'Inter Miami', pos: 'RW', color: '#ff8ac6'},
+{name: 'Antoine Griezmann', country: 'France', club: 'Atlético', pos: 'FW', color: '#ffd6a5'},
+{name: 'Lautaro Martínez', country: 'Argentina', club: 'Inter', pos: 'ST', color: '#ffc9de'},
+{name: 'Paulo Dybala', country: 'Argentina', club: 'Roma', pos: 'AM', color: '#d6e4ff'},
+{name: 'Raheem Sterling', country: 'England', club: 'Chelsea', pos: 'RW', color: '#bdb2ff'},
+{name: 'Kai Havertz', country: 'Germany', club: 'Arsenal', pos: 'AM', color: '#ffef9f'},
+{name: 'Serge Gnabry', country: 'Germany', club: 'Bayern', pos: 'RW', color: '#ffd6a5'},
+{name: 'Joshua Kimmich', country: 'Germany', club: 'Bayern', pos: 'CM', color: '#caffbf'},
+{name: 'Philippe Coutinho', country: 'Brazil', club: 'Aston Villa', pos: 'AM', color: '#ffd6e0'},
+{name: 'Heung-min Son', country: 'South Korea', club: 'Spurs', pos: 'LW', color: '#a0c4ff'},
+{name: 'Bernardo Silva', country: 'Portugal', club: 'Man City', pos: 'RW', color: '#bde0fe'},
+{name: 'Frenkie de Jong', country: 'Netherlands', club: 'Barcelona', pos: 'CM', color: '#d6f5f0'},
+{name: 'Jude Bellingham', country: 'England', club: 'Real Madrid', pos: 'CM', color: '#ffd6e0'},
+{name: 'Victor Osimhen', country: 'Nigeria', club: 'Napoli', pos: 'ST', color: '#ffd6a5'},
+{name: 'Riyad Mahrez', country: 'Algeria', club: 'Al Ahli', pos: 'RW', color: '#9bf6ff'},
+{name: 'Sergio Busquets', country: 'Spain', club: 'Villarreal', pos: 'DM', color: '#fbe7c6'},
+{name: 'Marcelo', country: 'Brazil', club: '—', pos: 'LB', color: '#caffbf'},
+{name: 'Thiago Silva', country: 'Brazil', club: 'Chelsea', pos: 'CB', color: '#ffd6a5'},
+{name: 'David Beckham', country: 'England', club: '—', pos: 'RM', color: '#ffe0b2'},
+{name: 'Zlatan Ibrahimović', country: 'Sweden', club: 'AC Milan', pos: 'ST', color: '#ffc9de'},
+{name: 'Paolo Maldini', country: 'Italy', club: 'AC Milan', pos: 'CB', color: '#e9ff70'},
+{name: 'Francesco Totti', country: 'Italy', club: 'Roma', pos: 'SS', color: '#ffd6a5'},
+{name: 'Andrea Pirlo', country: 'Italy', club: '—', pos: 'CM', color: '#cfe3ff'},
+{name: 'Xavi', country: 'Spain', club: '—', pos: 'CM', color: '#d0f4de'},
+{name: 'Andrés Iniesta', country: 'Spain', club: '—', pos: 'CM', color: '#ffd6e0'},
+{name: 'Ronaldinho', country: 'Brazil', club: '—', pos: 'AM', color: '#ffadad'},
+{name: 'Roberto Carlos', country: 'Brazil', club: '—', pos: 'LB', color: '#caffbf'},
+{name: 'Gianluigi Buffon', country: 'Italy', club: 'Parma', pos: 'GK', color: '#d6e4ff'},
+{name: 'Iker Casillas', country: 'Spain', club: '—', pos: 'GK', color: '#bde0fe'},
+{name: 'Luis Suárez', country: 'Uruguay', club: 'Gremio', pos: 'ST', color: '#ffd6a5'},
+{name: 'Diego Maradona', country: 'Argentina', club: '—', pos: 'AM', color: '#ffd1dc'},
+{name: 'Pelé', country: 'Brazil', club: '—', pos: 'FW', color: '#fff1a8'},
+{name: 'Kaka', country: 'Brazil', club: '—', pos: 'AM', color: '#ffd6e0'},
+{name: 'Wayne Rooney', country: 'England', club: '—', pos: 'ST', color: '#a0c4ff'},
+{name: 'Steven Gerrard', country: 'England', club: '—', pos: 'CM', color: '#ffd6a5'},
+{name: 'Frank Lampard', country: 'England', club: '—', pos: 'CM', color: '#cfe3ff'},
+{name: 'Paul Scholes', country: 'England', club: '—', pos: 'CM', color: '#ffd6e0'},
+{name: 'Rio Ferdinand', country: 'England', club: '—', pos: 'CB', color: '#d6f5f0'},
+{name: 'Thierry Henry', country: 'France', club: 'Arsenal', pos: 'ST', color: '#ffd6a5'},
+{name: 'Dennis Bergkamp', country: 'Netherlands', club: 'Arsenal', pos: 'AM', color: '#e0f7fa'},
+{name: 'Kaka (Younger)', country: 'Brazil', club: '—', pos: 'AM', color: '#ffd6e0'},
+{name: 'Carlos Tevez', country: 'Argentina', club: '—', pos: 'FW', color: '#ffd6a5'},
+{name: 'Roberto Firmino', country: 'Brazil', club: 'Al Ahli', pos: 'ST', color: '#ffb4a2'},
+{name: 'Sergio Agüero', country: 'Argentina', club: '—', pos: 'ST', color: '#ffdebd'},
+{name: 'Hugo Lloris', country: 'France', club: 'Spurs', pos: 'GK', color: '#cfe3ff'},
+{name: 'Ederson', country: 'Brazil', club: 'Man City', pos: 'GK', color: '#bde0fe'},
+{name: 'Alphonso Davies', country: 'Canada', club: 'Bayern', pos: 'LB', color: '#caffbf'},
+{name: 'Trent Alexander-Arnold', country: 'England', club: 'Liverpool', pos: 'RB', color: '#ffd6a5'},
+{name: 'Andrew Robertson', country: 'Scotland', club: 'Liverpool', pos: 'LB', color: '#d0f4de'},
+{name: 'Koke', country: 'Spain', club: 'Atlético', pos: 'CM', color: '#ffd6e0'},
+{name: 'Dani Carvajal', country: 'Spain', club: 'Real Madrid', pos: 'RB', color: '#d6f5f0'},
+{name: 'Jan Oblak', country: 'Slovenia', club: 'Atlético', pos: 'GK', color: '#cfe3ff'},
+{name: 'Mats Hummels', country: 'Germany', club: 'Borussia', pos: 'CB', color: '#ffd6a5'},
+{name: 'Blaise Matuidi', country: 'France', club: '—', pos: 'CM', color: '#ffd6e0'},
+{name: 'Cesc Fàbregas', country: 'Spain', club: '—', pos: 'CM', color: '#cfe3ff'},
+{name: 'Ivan Rakitić', country: 'Croatia', club: 'Sevilla', pos: 'CM', color: '#ffd6a5'},
+{name: 'Edin Džeko', country: 'Bosnia', club: 'Inter', pos: 'ST', color: '#ffd6e0'},
+{name: 'Gonzalo Higuaín', country: 'Argentina', club: '—', pos: 'ST', color: '#ffb4a2'},
+{name: 'Ángel Di María', country: 'Argentina', club: 'Juventus', pos: 'RW', color: '#ffd6a5'},
+{name: 'Marouane Fellaini', country: 'Belgium', club: '—', pos: 'CM', color: '#ffd6e0'},
+{name: 'Alexis Sánchez', country: 'Chile', club: 'Inter', pos: 'LW', color: '#ffd6a5'},
+{name: 'Diego Forlán', country: 'Uruguay', club: '—', pos: 'ST', color: '#ffd6e0'},
+{name: 'Yaya Touré', country: 'Ivory Coast', club: '—', pos: 'CM', color: '#ffd6a5'},
+{name: 'N' + "'" + 'Golo Kanté', country: 'France', club: 'Al Ittihad', pos: 'CM', color: '#cfe3ff'},
+{name: 'Paulo Henrique Ganso', country: 'Brazil', club: '—', pos: 'AM', color: '#ffd6e0'},
+{name: 'Roberto Baggio', country: 'Italy', club: '—', pos: 'AM', color: '#ffd6a5'},
+{name: 'Ruud van Nistelrooy', country: 'Netherlands', club: '—', pos: 'ST', color: '#ffd6e0'},
+{name: 'Marcelo Brozović', country: 'Croatia', club: 'Al Nassr', pos: 'CM', color: '#d6f5f0'},
+{name: 'Olivier Giroud', country: 'France', club: 'AC Milan', pos: 'ST', color: '#ffd6a5'},
+{name: 'Angel Correa', country: 'Argentina', club: 'Atlético', pos: 'AM', color: '#ffd6e0'},
+{name: 'Ciro Immobile', country: 'Italy', club: 'Lazio', pos: 'ST', color: '#ffd6a5'},
+{name: 'Tammy Abraham', country: 'England', club: 'AS Roma', pos: 'ST', color: '#ffd6e0'},
+{name: 'Kai Havertz (alt)', country: 'Germany', club: '—', pos: 'AM', color: '#ffd6a5'},
+{name: 'Kaz (alt)', country: 'Germany', club: '—', pos: 'AM', color: '#ffd6a5'},
+{name: 'Kaz (alt)', country: 'Germany', club: '—', pos: 'AM', color: '#ffd6a5'}, 
+    ];
+
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    const q = document.getElementById('q');
+
+    function avatarLetters(name){
+      const parts = name.split(' ');
+      const a = (parts[0]?.[0]||'').toUpperCase();
+      const b = (parts[parts.length-1]?.[0]||'').toUpperCase();
+      return a + b;
+    }
+
+    function cardTpl(p){
+      return `<article class="card">
+        <div class="top">
+          <div class="avatar" style="background:${p.color}">${avatarLetters(p.name)}</div>
+          <div class="meta">
+            <div class="name">${p.name}</div>
+            <div class="sub">${p.country} · ${p.club}</div>
+          </div>
+        </div>
+        <div class="tags">
+          <span class="tag">Pozitsiya: ${p.pos}</span>
+          <span class="tag">Ism harfi: ${p.name[0].toUpperCase()}</span>
+        </div>
+      </article>`;
+    }
+
+    function render(list){
+      grid.innerHTML = list.map(cardTpl).join('');
+      empty.style.display = list.length? 'none' : '';
+    }
+
+    function filterByStartLetter(letter){
+      const L = (letter||'').trim().toLowerCase();
+      if(!L) { render(players); return; }
+      const res = players.filter(p => p.name.toLowerCase().startsWith(L));
+      render(res);
+    }
+
+    // Qidirish tugmasi va input
+    document.getElementById('search').addEventListener('click',()=> filterByStartLetter(q.value));
+    q.addEventListener('keydown',e=>{ if(e.key==='Enter') filterByStartLetter(q.value); });
+    q.addEventListener('input',()=>{ // jonli filtr (xohlasang olib tashlashing mumkin)
+      filterByStartLetter(q.value);
+    });
+
+    // Harflar chip-lari (A‑Z)
+    const lettersEl = document.getElementById('letters');
+    const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    AZ.forEach(ch=>{
+      const b = document.createElement('button');
+      b.className='chip'; b.textContent=ch;
+      b.addEventListener('click',()=>{ q.value=ch.toLowerCase(); filterByStartLetter(ch); setActive(ch); });
+      lettersEl.appendChild(b);
+    });
+    function setActive(ch){
+      [...lettersEl.children].forEach(x=> x.classList.toggle('active', x.textContent===ch));
+    }
+
+    // Dastlab hammasi chiqarilsin
+    render(players);
+  </script>
+</body>
+</html>
